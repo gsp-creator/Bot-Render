@@ -18,7 +18,8 @@ Digite o número da opção:
 1 - Saber mais sobre os projetos
 2 - Alterar endereço de transferência
 3 - Falar com o suporte
-4 - Outros assuntos"""
+4 - Outros assuntos
+5 - Encerrar o atendimento"""
 
 @app.route("/", methods=["GET"])
 def home():
@@ -43,19 +44,18 @@ def webhook():
                 return jsonify({"status": "empty_message"}), 200
 
             # 🛡️ TRAVA ANTI-LOOP E FILTRO DE TIE-IN DA CONTA TRIAL
-            # Se a mensagem recebida for o próprio bot falando (ou o eco do menu), ignora
             texto_upper = texto_cliente.upper()
-            if "COMO POSSO TE AJUDAR" in texto_upper or "AUTOMAÇÕES INCRÍVEIS" in texto_upper or "CONFIRMADO EM MAIÚSCULAS" in texto_upper:
+            if "COMO POSSO TE AJUDAR" in texto_upper or "AUTOMAÇÕES INCRÍVEIS" in texto_upper or "CONFIRMADO EM MAIÚSCULAS" in texto_upper or "ATENDIMENTO ENCERRADO" in texto_upper:
                 print("Loop evitado: Mensagem gerada pelo bot ignorada.")
                 return jsonify({"status": "ignored_bot_output"}), 200
             
             # Se a mensagem contiver o bloco enorme de JSON gerado pelo loop anterior do Trial, limpa
             if "MESSAGE" in texto_upper and "CONTA EM TRIAL" in texto_upper:
-                # Extrai apenas o comando final caso esteja embutido, ou ignora se for eco
                 if "'MESSAGE': '1'" in texto_upper or "'1'" in texto_upper: texto_cliente = "1"
                 elif "'MESSAGE': '2'" in texto_upper or "'2'" in texto_upper: texto_cliente = "2"
                 elif "'MESSAGE': '3'" in texto_upper or "'3'" in texto_upper: texto_cliente = "3"
                 elif "'MESSAGE': '4'" in texto_upper or "'4'" in texto_upper: texto_cliente = "4"
+                elif "'MESSAGE': '5'" in texto_upper or "'5'" in texto_upper: texto_cliente = "5"
                 elif "OI" in texto_upper or "OLA" in texto_upper: texto_cliente = "oi"
                 else:
                     return jsonify({"status": "ignored_raw_trial_block"}), 200
@@ -63,7 +63,7 @@ def webhook():
             # Atualiza o upper pós-limpeza
             texto_upper = texto_cliente.upper()
 
-            # Menu de Opções
+            # Execução das Opções do Menu
             if texto_cliente == "1":
                 enviar_resposta(remetente, "Excelente! Desenvolvemos automações incríveis com Python. 🐍")
             elif texto_cliente == "2":
@@ -72,8 +72,10 @@ def webhook():
                 enviar_resposta(remetente, "Avisado! O suporte já vai falar com você.")
             elif texto_cliente == "4":
                 enviar_resposta(remetente, "Por favor, digite sua dúvida detalhadamente.")
+            elif texto_cliente == "5":
+                enviar_resposta(remetente, "Atendimento encerrado com sucesso! Se precisar de algo mais, basta enviar um 'Oi'. 👋🤖")
             
-            # 🔠 Trata o envio do endereço de forma limpa
+            # 🔠 Trata o envio do endereço de forma limpa (Sempre em MAIÚSCULAS)
             elif len(texto_cliente) > 5 and not texto_cliente.isdigit() and "{" not in texto_cliente:
                 endereco_maiusculo = texto_cliente.upper()
                 enviar_resposta(remetente, f"✓ ENDEREÇO CONFIRMADO EM MAIÚSCULAS:\n{endereco_maiusculo}")
