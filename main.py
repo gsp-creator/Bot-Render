@@ -30,11 +30,6 @@ def webhook():
     
     if dados:
         try:
-            # 🛡️ TRAVA ANTI-LOOP PARA CONTA TRIAL E AUTO-MENSAGENS:
-            # Se a mensagem foi enviada pelo próprio bot (fromMe), ignoramos na hora.
-            if dados.get("fromMe") is True or dados.get("isGroup") is True:
-                return jsonify({"status": "ignored_self_message"}), 200
-                
             texto_cliente = dados.get("text", "")
             if not texto_cliente and dados.get("message"):
                 texto_cliente = dados.get("message", {}).get("text", "")
@@ -42,9 +37,13 @@ def webhook():
             texto_cliente = str(texto_cliente).strip()
             remetente = dados.get("phone")
             
-            # Segunda trava: ignora se a mensagem interceptada for o próprio aviso de Trial da Z-API
-            if "CONTA EM TRIAL" in texto_cliente.upper() or "FAVOR DESCONSIDERAR" in texto_cliente.upper():
-                return jsonify({"status": "ignored_trial_warning"}), 200
+            # 🛡️ TRAVA INTELIGENTE ANTI-LOOP PARA SEU NÚMERO:
+            # Só ignora a mensagem se o texto contiver partes dos textos enviados pelo próprio BOT.
+            # Se você digitar "1", "2" ou um endereço, o código vai processar normalmente!
+            texto_upper = texto_cliente.upper()
+            if "COMO POSSO TE AJUDAR" in texto_upper or "CONTA EM TRIAL" in texto_upper or "ENDEREÇO CONFIRMADO" in texto_upper or "AUTOMAÇÕES INCRÍVEIS" in texto_upper:
+                print("Loop evitado: Mensagem gerada pelo sistema ignorada.")
+                return jsonify({"status": "ignored_bot_output"}), 200
 
             if texto_cliente and remetente:
                 # Menu de Opções
@@ -58,7 +57,6 @@ def webhook():
                     enviar_resposta(remetente, "Por favor, digite sua dúvida detalhadamente.")
                 
                 # 🔠 Trata o envio do endereço: se não for opção do menu e tiver texto
-                # Independentemente de como o usuário digitar, aparece em MAIÚSCULA
                 elif len(texto_cliente) > 5 and not texto_cliente.isdigit():
                     endereco_maiusculo = texto_cliente.upper()
                     enviar_resposta(remetente, f"✓ ENDEREÇO CONFIRMADO EM MAIÚSCULAS:\n{endereco_maiusculo}")
