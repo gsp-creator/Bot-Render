@@ -30,7 +30,7 @@ def webhook():
     
     if dados:
         try:
-            # Captura o texto puro enviado
+            # Pegando as informações brutas da Z-API
             texto_cliente = dados.get("text", "")
             if not texto_cliente and dados.get("message"):
                 texto_cliente = dados.get("message", {}).get("text", "")
@@ -38,35 +38,49 @@ def webhook():
             texto_cliente = str(texto_cliente).strip()
             remetente = dados.get("phone")
             
-            # 🛡️ TRAVA ANTI-LOOP: Ignora mensagens geradas pelo próprio fluxo do bot
+            # Se for uma notificação vazia, ignora
+            if not texto_cliente or not remetente:
+                return jsonify({"status": "empty_message"}), 200
+
+            # 🛡️ TRAVA ANTI-LOOP E FILTRO DE TIE-IN DA CONTA TRIAL
+            # Se a mensagem recebida for o próprio bot falando (ou o eco do menu), ignora
             texto_upper = texto_cliente.upper()
             if "COMO POSSO TE AJUDAR" in texto_upper or "AUTOMAÇÕES INCRÍVEIS" in texto_upper or "CONFIRMADO EM MAIÚSCULAS" in texto_upper:
-                print("Loop evitado: Mensagem do bot ignorada.")
+                print("Loop evitado: Mensagem gerada pelo bot ignorada.")
                 return jsonify({"status": "ignored_bot_output"}), 200
+            
+            # Se a mensagem contiver o bloco enorme de JSON gerado pelo loop anterior do Trial, limpa
+            if "MESSAGE" in texto_upper and "CONTA EM TRIAL" in texto_upper:
+                # Extrai apenas o comando final caso esteja embutido, ou ignora se for eco
+                if "'MESSAGE': '1'" in texto_upper or "'1'" in texto_upper: texto_cliente = "1"
+                elif "'MESSAGE': '2'" in texto_upper or "'2'" in texto_upper: texto_cliente = "2"
+                elif "'MESSAGE': '3'" in texto_upper or "'3'" in texto_upper: texto_cliente = "3"
+                elif "'MESSAGE': '4'" in texto_upper or "'4'" in texto_upper: texto_cliente = "4"
+                elif "OI" in texto_upper or "OLA" in texto_upper: texto_cliente = "oi"
+                else:
+                    return jsonify({"status": "ignored_raw_trial_block"}), 200
 
-            if texto_cliente and remetente:
-                # Se for o aviso de Trial da Z-API puro, não responde nada
-                if "CONTA EM TRIAL" in texto_upper and len(texto_cliente) > 200 and not "OI" in texto_upper and not "OLA" in texto_upper:
-                    return jsonify({"status": "ignored_trial_system"}), 200
+            # Atualiza o upper pós-limpeza
+            texto_upper = texto_cliente.upper()
 
-                # Menu de Opções
-                if texto_cliente == "1":
-                    enviar_resposta(remetente, "Excelente! Desenvolvemos automações incríveis com Python. 🐍")
-                elif texto_cliente == "2":
-                    enviar_resposta(remetente, "Por favor, digite o NOVO ENDEREÇO e confirme com Enter:")
-                elif texto_cliente == "3":
-                    enviar_resposta(remetente, "Avisado! O suporte já vai falar com você.")
-                elif texto_cliente == "4":
-                    enviar_resposta(remetente, "Por favor, digite sua dúvida detalhadamente.")
-                
-                # 🔠 Trata o envio do endereço de forma estrita (evita o bug do JSON da imagem)
-                elif len(texto_cliente) > 5 and not texto_cliente.isdigit() and "{" not in texto_cliente and "}" not in texto_cliente:
-                    endereco_maiusculo = texto_cliente.upper()
-                    enviar_resposta(remetente, f"✓ ENDEREÇO CONFIRMADO EM MAIÚSCULAS:\n{endereco_maiusculo}")
-                
-                # Se for uma mensagem normal (Oi, Olá), exibe o Menu compacto
-                elif texto_cliente.lower() in ["oi", "ola", "olá", "menu", "bom dia", "boa tarde"]:
-                    enviar_resposta(remetente, MENU)
+            # Menu de Opções
+            if texto_cliente == "1":
+                enviar_resposta(remetente, "Excelente! Desenvolvemos automações incríveis com Python. 🐍")
+            elif texto_cliente == "2":
+                enviar_resposta(remetente, "Por favor, digite o NOVO ENDEREÇO e confirme com Enter:")
+            elif texto_cliente == "3":
+                enviar_resposta(remetente, "Avisado! O suporte já vai falar com você.")
+            elif texto_cliente == "4":
+                enviar_resposta(remetente, "Por favor, digite sua dúvida detalhadamente.")
+            
+            # 🔠 Trata o envio do endereço de forma limpa
+            elif len(texto_cliente) > 5 and not texto_cliente.isdigit() and "{" not in texto_cliente:
+                endereco_maiusculo = texto_cliente.upper()
+                enviar_resposta(remetente, f"✓ ENDEREÇO CONFIRMADO EM MAIÚSCULAS:\n{endereco_maiusculo}")
+            
+            # Qualquer palavra de saudação aciona o menu compacto
+            else:
+                enviar_resposta(remetente, MENU)
                     
         except Exception as e:
             print(f"Erro ao processar o webhook: {e}")
